@@ -152,6 +152,12 @@ function Kpi({ label, value, foot, ribbon }) {
 
 function TeamView({ store }) {
   const { state } = store;
+  // Presencia real: en modo nube usa onlineUsers; en local cae a t.live (demo).
+  const onlineSet = React.useMemo(() => {
+    if (store.cloud) return new Set((store.onlineUsers || []).map(u => u.id));
+    return new Set(TEAM.filter(t => t.live).map(t => t.id));
+  }, [store.cloud, store.onlineUsers]);
+  const isOnline = (id) => onlineSet.has(id);
   const counts = useMemo(() => {
     const map = {};
     state.phases.flatMap(p => p.tasks).forEach(t => {
@@ -183,7 +189,7 @@ function TeamView({ store }) {
           const avg = c.total ? Math.round(c.prog/c.total) : 0;
           return (
             <div className="team-card" key={t.id}>
-              <div className={`av ${t.live ? 'live':''}`} style={{background: t.color}}>{t.init}</div>
+              <div className={`av ${isOnline(t.id) ? 'live':''}`} style={{background: t.color}}>{t.init}</div>
               <div style={{flex:1}}>
                 <div className="nm">{t.nm}</div>
                 <div className="stats">{c.total} tareas · {c.done} listas · {avg}% promedio</div>
@@ -222,9 +228,9 @@ function TeamView({ store }) {
                       </select>
                     </td>
                     <td style={{padding:'12px 8px', borderBottom:'1px dashed var(--border)'}}>
-                      <span style={{display:'inline-flex', alignItems:'center', gap:6, fontSize:12, color: t.live ? 'var(--green)' : 'var(--text-3)'}}>
-                        <span style={{width:8, height:8, borderRadius:'50%', background: t.live ? 'var(--green)' : 'var(--text-3)'}}/>
-                        {t.live ? 'En línea' : 'Desconectado'}
+                      <span style={{display:'inline-flex', alignItems:'center', gap:6, fontSize:12, color: isOnline(t.id) ? 'var(--green)' : 'var(--text-3)'}}>
+                        <span style={{width:8, height:8, borderRadius:'50%', background: isOnline(t.id) ? 'var(--green)' : 'var(--text-3)'}}/>
+                        {isOnline(t.id) ? 'En línea' : 'Desconectado'}
                       </span>
                     </td>
                   </tr>

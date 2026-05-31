@@ -38,8 +38,7 @@ function PanelView({ store, onGoGantt }) {
 
   // riesgo: atrasadas
   const atrasadas = useMemo(() => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    return state.phases.flatMap(p => p.tasks).filter(t => !t.milestone && parseISO(t.end) < today && getProg(t).avg < 100).length;
+    return state.phases.flatMap(p => p.tasks).filter(t => window.isOverdue ? window.isOverdue(t) : false).length;
   }, [state.phases]);
 
   return (

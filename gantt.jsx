@@ -18,9 +18,16 @@ function dayIndexFrom(startISO, isoDate) {
 // una tarea está atrasada si su término ya pasó y no está completa
 function isOverdue(task) {
   if (task.milestone) return false;
-  if (getProg(task).avg >= 100) return false;
   const today = new Date(); today.setHours(0,0,0,0);
-  return parseISO(getEnvelope(task).end) < today;
+  const prog = getProg(task);
+  if (task.splitDates) {
+    // solo cuenta como atrasada la sede que TIENE fecha propia asignada y sigue incompleta
+    const penLate = task.endPen && prog.pen < 100 && parseISO(task.endPen) < today;
+    const tobLate = task.endTob && prog.tob < 100 && parseISO(task.endTob) < today;
+    return !!(penLate || tobLate);
+  }
+  if (prog.avg >= 100) return false;
+  return !!(task.end && parseISO(task.end) < today);
 }
 
 // Barra arrastrable genérica para un rango de fechas dado.
@@ -783,3 +790,4 @@ function TaskEditor({ task, phaseId, onClose, onPatch, onRemove }) {
 
 window.GanttView = GanttView;
 window.TaskEditor = TaskEditor;
+window.isOverdue = isOverdue;

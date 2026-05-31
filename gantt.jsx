@@ -18,51 +18,29 @@ function dayIndexFrom(startISO, isoDate) {
 // una tarea está atrasada si su término ya pasó y no está completa
 function isOverdue(task) {
   if (task.milestone) return false;
-  if ((task.progress || 0) >= 100) return false;
+  if (getProg(task).avg >= 100) return false;
   const today = new Date(); today.setHours(0,0,0,0);
-  return parseISO(task.end) < today;
+  return parseISO(getEnvelope(task).end) < today;
 }
 
-function TaskBar({ task, phaseIdx, startISO, totalDays, onPatch, color, soft, onEdit, dayW }) {
+// Barra arrastrable genérica para un rango de fechas dado.
+function DragBar({ startDate, endDate, startISO, totalDays, dayW, onCommit, onEdit, color, overdue, fills, label, pct, title, half, top }) {
   const dragState = useRef(null);
   const [drag, setDrag] = useState(null);
 
-  if (task.milestone) {
-    const dx = dayIndexFrom(startISO, task.start);
-    return (
-      <>
-        <div
-          className="tl-milestone"
-          style={{ left: dx * dayW + dayW/2 }}
-          onClick={onEdit}
-          title={`${task.title} · ${fmtFull(task.start)}`}
-        />
-        <div className="tl-milestone-label" style={{ left: dx * dayW + dayW/2 + 4 }}>
-          {task.title}
-        </div>
-      </>
-    );
-  }
-
-  const startI = dayIndexFrom(startISO, task.start);
-  const endI   = dayIndexFrom(startISO, task.end);
-  const days   = endI - startI + 1;
+  const startI = dayIndexFrom(startISO, startDate);
+  const endI   = dayIndexFrom(startISO, endDate || startDate);
+  const days   = Math.max(1, endI - startI + 1);
+  if (!isFinite(startI) || !isFinite(endI)) return null;
 
   const effectiveStart = drag?.start ?? startI;
   const effectiveDays  = drag?.days ?? days;
-
   const left = effectiveStart * dayW;
   const width = effectiveDays * dayW;
 
   const beginDrag = (mode) => (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragState.current = {
-      mode,
-      startX: e.clientX,
-      origStart: startI,
-      origDays: days,
-    };
+    e.preventDefault(); e.stopPropagation();
+    dragState.current = { mode, startX: e.clientX, origStart: startI, origDays: days };
     const move = (ev) => {
       const ds = dragState.current;
       const deltaDays = Math.round((ev.clientX - ds.startX) / dayW);
@@ -70,53 +48,91 @@ function TaskBar({ task, phaseIdx, startISO, totalDays, onPatch, color, soft, on
         setDrag({ start: Math.max(0, Math.min(totalDays - ds.origDays, ds.origStart + deltaDays)), days: ds.origDays });
       } else if (ds.mode === 'left') {
         const newStart = Math.max(0, Math.min(ds.origStart + ds.origDays - 1, ds.origStart + deltaDays));
-        const newDays = ds.origStart + ds.origDays - newStart;
-        setDrag({ start: newStart, days: newDays });
+        setDrag({ start: newStart, days: ds.origStart + ds.origDays - newStart });
       } else if (ds.mode === 'right') {
-        const newDays = Math.max(1, ds.origDays + deltaDays);
-        setDrag({ start: ds.origStart, days: newDays });
+        setDrag({ start: ds.origStart, days: Math.max(1, ds.origDays + deltaDays) });
       }
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
-      const final = dragState.current;
       if (drag) {
-        const newStart = fmtISO(addDays(parseISO(startISO), drag.start));
-        const newEnd   = fmtISO(addDays(parseISO(startISO), drag.start + drag.days - 1));
-        if (newStart !== task.start || newEnd !== task.end) {
-          onPatch({ start: newStart, end: newEnd });
-        }
+        const ns = fmtISO(addDays(parseISO(startISO), drag.start));
+        const ne = fmtISO(addDays(parseISO(startISO), drag.start + drag.days - 1));
+        if (ns !== startDate || ne !== endDate) onCommit(ns, ne);
       }
-      dragState.current = null;
-      setDrag(null);
+      dragState.current = null; setDrag(null);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   };
 
-  const pct = task.progress || 0;
-  const barColor = pct >= 100 ? '#2EB77E' : color;
-  const overdue = isOverdue(task);
+  const style = { left, width, background: `linear-gradient(180deg, ${color} 0%, ${shadeColor(color, -12)} 100%)` };
+  if (half) { style.height = 14; style.top = top; style.bottom = 'auto'; }
 
   return (
     <div
-      className={`tl-bar ${overdue ? 'overdue' : ''}`}
-      style={{
-        left,
-        width,
-        background: `linear-gradient(180deg, ${barColor} 0%, ${shadeColor(barColor, -12)} 100%)`,
-      }}
+      className={`tl-bar ${overdue ? 'overdue' : ''} ${half ? 'half' : ''}`}
+      style={style}
       onPointerDown={beginDrag('move')}
       onClick={(e) => { if (!drag) onEdit && onEdit(); }}
-      title={`${task.title} · ${fmtFull(task.start)} → ${fmtFull(task.end)}`}
+      title={title}
     >
       <div className="resize-handle l" onPointerDown={beginDrag('left')} />
-      <div className="fill" style={{ width: `${pct}%` }} />
-      <span className="label">{task.title}</span>
-      <span className="pct">{pct}%</span>
+      {fills.map((f, i) => <div key={i} className={`fill ${f.cls}`} style={{ width: `${f.pct}%` }} />)}
+      {label && <span className="label">{label}</span>}
+      {pct != null && <span className="pct">{pct}</span>}
       <div className="resize-handle r" onPointerDown={beginDrag('right')} />
     </div>
+  );
+}
+
+function TaskBar({ task, phaseIdx, startISO, totalDays, onPatch, color, soft, onEdit, dayW }) {
+  if (!task.start) return null;
+
+  if (task.milestone) {
+    const dx = dayIndexFrom(startISO, task.start);
+    if (!isFinite(dx)) return null;
+    return (
+      <>
+        <div className="tl-milestone" style={{ left: dx * dayW + dayW/2 }} onClick={onEdit}
+          title={`${task.title} · ${fmtFull(task.start)}`} />
+        <div className="tl-milestone-label" style={{ left: dx * dayW + dayW/2 + 4 }}>{task.title}</div>
+      </>
+    );
+  }
+
+  const prog = getProg(task);
+  const overdue = isOverdue(task);
+
+  // fechas distintas por sede → dos barras apiladas
+  if (task.splitDates) {
+    const pen = getDates(task, 'pen');
+    const tob = getDates(task, 'tob');
+    return (
+      <>
+        <DragBar startDate={pen.start} endDate={pen.end} startISO={startISO} totalDays={totalDays} dayW={dayW}
+          color={prog.pen >= 100 ? '#2EB77E' : '#2A6FB5'} overdue={overdue} half top={5}
+          fills={[{cls:'fill-solid', pct: prog.pen}]} label={task.title} pct={`PEÑ ${prog.pen}%`}
+          title={`Peñalolén · ${fmtFull(pen.start)} → ${fmtFull(pen.end)} · ${prog.pen}%`}
+          onEdit={onEdit} onCommit={(s,e) => onPatch({ startPen: s, endPen: e })} />
+        <DragBar startDate={tob.start} endDate={tob.end} startISO={startISO} totalDays={totalDays} dayW={dayW}
+          color={prog.tob >= 100 ? '#2EB77E' : '#E0992E'} overdue={overdue} half top={23}
+          fills={[{cls:'fill-solid', pct: prog.tob}]} label={null} pct={`TOB ${prog.tob}%`}
+          title={`Tobalaba · ${fmtFull(tob.start)} → ${fmtFull(tob.end)} · ${prog.tob}%`}
+          onEdit={onEdit} onCommit={(s,e) => onPatch({ startTob: s, endTob: e })} />
+      </>
+    );
+  }
+
+  // fechas compartidas → una barra con dos franjas
+  return (
+    <DragBar startDate={task.start} endDate={task.end} startISO={startISO} totalDays={totalDays} dayW={dayW}
+      color={prog.avg >= 100 ? '#2EB77E' : color} overdue={overdue}
+      fills={[{cls:'fill-pen', pct: prog.pen}, {cls:'fill-tob', pct: prog.tob}]}
+      label={task.title} pct={`${prog.pen}·${prog.tob}%`}
+      title={`${task.title} · ${fmtFull(task.start)} → ${fmtFull(task.end)} · Peñalolén ${prog.pen}% · Tobalaba ${prog.tob}%`}
+      onEdit={onEdit} onCommit={(s,e) => onPatch({ start: s, end: e })} />
   );
 }
 
@@ -132,20 +148,24 @@ function shadeColor(hex, percent) {
 }
 
 function PhaseBar({ phase, startISO, color, dayW }) {
-  const tasks = phase.tasks.filter(t => !t.milestone);
+  const tasks = phase.tasks.filter(t => !t.milestone && t.start && t.end);
   if (!tasks.length) return null;
-  const starts = tasks.map(t => dayIndexFrom(startISO, t.start));
-  const ends   = tasks.map(t => dayIndexFrom(startISO, t.end));
+  const starts = tasks.map(t => dayIndexFrom(startISO, getEnvelope(t).start));
+  const ends   = tasks.map(t => dayIndexFrom(startISO, getEnvelope(t).end));
   const s = Math.min(...starts);
   const e = Math.max(...ends);
   const left = s * dayW;
   const width = (e - s + 1) * dayW;
-  const avg = tasks.length ? Math.round(tasks.reduce((a,t)=>a+t.progress,0)/tasks.length) : 0;
+  if (!isFinite(left) || !isFinite(width) || width <= 0) return null;
+  const progs = tasks.map(getProg);
+  const avgPen = Math.round(progs.reduce((a,p)=>a+p.pen,0)/tasks.length);
+  const avgTob = Math.round(progs.reduce((a,p)=>a+p.tob,0)/tasks.length);
   return (
-    <div className="tl-bar phase" style={{ left, width }}>
-      <div className="fill" style={{ width: `${avg}%` }} />
+    <div className="tl-bar phase" style={{ left, width }} title={`Peñalolén ${avgPen}% · Tobalaba ${avgTob}%`}>
+      <div className="fill fill-pen" style={{ width: `${avgPen}%` }} />
+      <div className="fill fill-tob" style={{ width: `${avgTob}%` }} />
       <span className="label">{phase.title}</span>
-      <span className="pct">{avg}%</span>
+      <span className="pct">{avgPen}·{avgTob}%</span>
     </div>
   );
 }
@@ -309,8 +329,12 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
               <span className="v" style={{padding:'4px 0'}}>{PROJECT_WEEKS} semanas</span>
             </div>
             <div className="gantt-info-item">
-              <label>Avance global</label>
-              <span className="v" style={{padding:'4px 0', color: '#2EB77E'}}>{stats.avgProgress}%</span>
+              <label>Avance · Peñalolén / Tobalaba</label>
+              <span className="v" style={{padding:'4px 0', display:'flex', gap:8}}>
+                <span style={{color:'#2A6FB5'}}>{stats.avgPen}%</span>
+                <span style={{color:'var(--text-3)'}}>/</span>
+                <span style={{color:'#C77F1E'}}>{stats.avgTob}%</span>
+              </span>
             </div>
           </div>
           <div className="gantt-spacer" />
@@ -524,16 +548,29 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
   );
 }
 
+function DualProg({ pen, tob }) {
+  return (
+    <div className="dual-prog">
+      <span className="dp-row"><i className="dp-dot" style={{background:'#2A6FB5'}}/>{pen}%</span>
+      <span className="dp-row"><i className="dp-dot" style={{background:'#E0992E'}}/>{tob}%</span>
+    </div>
+  );
+}
+
 function PhaseProgressChip({ phase }) {
   const tasks = phase.tasks.filter(t => !t.milestone);
-  const avg = tasks.length ? Math.round(tasks.reduce((a,t)=>a+t.progress,0)/tasks.length) : 0;
-  return <span className={`progress-chip ${progressClass(avg)}`}>{avg}%</span>;
+  if (!tasks.length) return <DualProg pen={0} tob={0} />;
+  const progs = tasks.map(getProg);
+  const avgPen = Math.round(progs.reduce((a,p)=>a+p.pen,0)/tasks.length);
+  const avgTob = Math.round(progs.reduce((a,p)=>a+p.tob,0)/tasks.length);
+  return <DualProg pen={avgPen} tob={avgTob} />;
 }
 
 function TaskRowLeft({ task, phase, palette, onPatch, onRemove, onEdit }) {
   const respIds = getResp(task);
   const member = TEAM.find(t => t.id === respIds[0]) || TEAM[0];
-  const days = workdays(task.start, task.end);
+  const env = getEnvelope(task);
+  const days = workdays(env.start, env.end);
   if (task.milestone) {
     return (
       <div className="gantt-row-left">
@@ -574,15 +611,29 @@ function TaskRowLeft({ task, phase, palette, onPatch, onRemove, onEdit }) {
       <div className="gantt-resp">
         <ResponsiblePicker compact value={respIds} onChange={(arr) => onPatch({ responsibles: arr, responsible: arr[0] })} />
       </div>
-      <div className="gantt-date">
-        <input type="date" value={task.start} onChange={(e) => onPatch({ start: e.target.value })} />
-      </div>
-      <div className="gantt-date">
-        <input type="date" value={task.end} onChange={(e) => onPatch({ end: e.target.value })} />
-      </div>
+      {task.splitDates ? (
+        <>
+          <div className="gantt-date gantt-date-split" onClick={onEdit} title="Fechas distintas por sede — editar">
+            <span className="split-tag">✦ por sede</span>
+            <span className="split-range">{fmtDM(getEnvelope(task).start)}</span>
+          </div>
+          <div className="gantt-date gantt-date-split" onClick={onEdit} title="Fechas distintas por sede — editar">
+            <span className="split-range">{fmtDM(getEnvelope(task).end)}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="gantt-date">
+            <input type="date" value={task.start} onChange={(e) => onPatch({ start: e.target.value })} />
+          </div>
+          <div className="gantt-date">
+            <input type="date" value={task.end} onChange={(e) => onPatch({ end: e.target.value })} />
+          </div>
+        </>
+      )}
       <div className="gantt-dur">{days}d</div>
       <div onClick={onEdit} style={{cursor:'pointer'}}>
-        <span className={`progress-chip ${progressClass(task.progress)}`}>{task.progress}%</span>
+        <DualProg pen={getProg(task).pen} tob={getProg(task).tob} />
       </div>
       <button className="row-del" title={`Eliminar tarea ${task.wbs}`} onClick={(e) => { e.stopPropagation(); onRemove(); }}>
         <Icon.Trash size={14}/>
@@ -615,33 +666,104 @@ function TaskEditor({ task, phaseId, onClose, onPatch, onRemove }) {
             <label>Título</label>
             <input value={local.title} onChange={(e) => setLocal({...local, title: e.target.value})} />
           </div>
-          <div className="field-row">
-            <div className="field">
-              <label>Responsables</label>
-              <ResponsiblePicker
-                value={getResp(local)}
-                onChange={(arr) => setLocal({...local, responsibles: arr, responsible: arr[0]})}
-              />
-            </div>
-            <div className="field">
-              <label>Avance</label>
-              <input type="range" min="0" max="100" step="5" value={local.progress}
-                onChange={(e) => setLocal({...local, progress: Number(e.target.value)})}/>
-              <div style={{fontFamily:'JetBrains Mono', fontSize:13, fontWeight:700, color:'var(--navy)', marginTop:4}}>{local.progress}%</div>
+          <div className="field">
+            <label>Responsables</label>
+            <ResponsiblePicker
+              value={getResp(local)}
+              onChange={(arr) => setLocal({...local, responsibles: arr, responsible: arr[0]})}
+            />
+          </div>
+          <div className="field">
+            <label>Avance por sede</label>
+            <div className="sede-sliders">
+              {(() => {
+                const lp = getProg(local);
+                const setSede = (key, val) => {
+                  const next = { ...local, [key]: val };
+                  const np = getProg(next);
+                  next.progress = Math.round((np.pen + np.tob) / 2);
+                  setLocal(next);
+                };
+                return (
+                  <>
+                    <div className="sede-slider">
+                      <div className="sede-slider-head">
+                        <span><i className="dp-dot" style={{background:'#2A6FB5'}}/> Peñalolén</span>
+                        <strong style={{color:'#2A6FB5'}}>{lp.pen}%</strong>
+                      </div>
+                      <input type="range" min="0" max="100" step="5" value={lp.pen}
+                        onChange={(e) => setSede('progPen', Number(e.target.value))}/>
+                    </div>
+                    <div className="sede-slider">
+                      <div className="sede-slider-head">
+                        <span><i className="dp-dot" style={{background:'#E0992E'}}/> Tobalaba</span>
+                        <strong style={{color:'#C77F1E'}}>{lp.tob}%</strong>
+                      </div>
+                      <input type="range" min="0" max="100" step="5" value={lp.tob}
+                        onChange={(e) => setSede('progTob', Number(e.target.value))}/>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
-          <div className="field-row">
+          {task.milestone ? (
             <div className="field">
-              <label>Inicio</label>
-              <input type="date" value={local.start} onChange={(e) => setLocal({...local, start: e.target.value})} />
+              <label>Fecha del hito</label>
+              <input type="date" value={local.start} onChange={(e) => setLocal({...local, start: e.target.value, end: e.target.value})} />
             </div>
-            {!task.milestone && (
-              <div className="field">
-                <label>Término</label>
-                <input type="date" value={local.end} onChange={(e) => setLocal({...local, end: e.target.value})} />
+          ) : (
+            <>
+              <div className="field" style={{marginBottom: local.splitDates ? 14 : 14}}>
+                <label>Fechas</label>
+                <label className="sede-toggle">
+                  <input type="checkbox" checked={!!local.splitDates}
+                    onChange={(e) => {
+                      const on = e.target.checked;
+                      if (on) {
+                        // al activar, inicializa ambas sedes con las fechas compartidas
+                        setLocal({...local, splitDates: true,
+                          startPen: local.startPen || local.start, endPen: local.endPen || local.end,
+                          startTob: local.startTob || local.start, endTob: local.endTob || local.end});
+                      } else {
+                        setLocal({...local, splitDates: false});
+                      }
+                    }}/>
+                  <span>Fechas distintas por sede</span>
+                </label>
               </div>
-            )}
-          </div>
+
+              {!local.splitDates ? (
+                <div className="field-row">
+                  <div className="field">
+                    <label>Inicio</label>
+                    <input type="date" value={local.start} onChange={(e) => setLocal({...local, start: e.target.value})} />
+                  </div>
+                  <div className="field">
+                    <label>Término</label>
+                    <input type="date" value={local.end} onChange={(e) => setLocal({...local, end: e.target.value})} />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="sede-dates">
+                    <div className="sede-dates-tag"><i className="dp-dot" style={{background:'#2A6FB5'}}/> Peñalolén</div>
+                    <div className="field"><label>Inicio</label>
+                      <input type="date" value={local.startPen || local.start} onChange={(e) => setLocal({...local, startPen: e.target.value})} /></div>
+                    <div className="field"><label>Término</label>
+                      <input type="date" value={local.endPen || local.end} onChange={(e) => setLocal({...local, endPen: e.target.value})} /></div>
+                  </div>
+                  <div className="sede-dates">
+                    <div className="sede-dates-tag"><i className="dp-dot" style={{background:'#E0992E'}}/> Tobalaba</div>
+                    <div className="field"><label>Inicio</label>
+                      <input type="date" value={local.startTob || local.start} onChange={(e) => setLocal({...local, startTob: e.target.value})} /></div>
+                    <div className="field"><label>Término</label>
+                      <input type="date" value={local.endTob || local.end} onChange={(e) => setLocal({...local, endTob: e.target.value})} /></div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
           <div className="field">
             <label>Notas</label>
             <textarea rows="3" placeholder="Observaciones, dependencias, acuerdos del equipo…"

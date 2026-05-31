@@ -182,11 +182,16 @@ Responde EXCLUSIVAMENTE con JSON válido sin texto adicional, con esta forma:
 // === Export ===
 function ExportModal({ onClose, store, showToast }) {
   const csv = () => {
-    const rows = [['EDT', 'Tarea', 'Responsable', 'Inicio', 'Término', 'Días', '% Avance', 'Fase']];
+    const rows = [['EDT', 'Tarea', 'Responsable(s)', 'Inicio', 'Término', 'Días', '% Peñalolén', '% Tobalaba', 'Fechas por sede', 'Fase']];
     store.state.phases.forEach(p => {
       p.tasks.forEach(t => {
-        const m = TEAM.find(x => x.id === t.responsible);
-        rows.push([t.wbs, t.title, m?.nm || '', t.start, t.end, workdays(t.start, t.end), t.progress, p.title]);
+        const names = getResp(t).map(id => TEAM.find(x => x.id === id)?.nm).filter(Boolean).join(' / ');
+        const pr = getProg(t);
+        const env = getEnvelope(t);
+        const detalle = t.splitDates
+          ? `Peñalolén ${getDates(t,'pen').start}→${getDates(t,'pen').end} · Tobalaba ${getDates(t,'tob').start}→${getDates(t,'tob').end}`
+          : '';
+        rows.push([t.wbs, t.title, names, env.start, env.end, workdays(env.start, env.end), pr.pen, pr.tob, detalle, p.title]);
       });
     });
     const out = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');

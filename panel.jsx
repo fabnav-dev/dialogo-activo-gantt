@@ -1,6 +1,6 @@
 /* === panel.jsx — Dashboard general (KPIs, anillo, próximas tareas) === */
 
-function Ring({ value, size=140, stroke=14, color='#2EB77E' }) {
+function Ring({ value, size=120, stroke=12, color='#2EB77E', label='Avance global' }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const off = c - (value/100) * c;
@@ -13,8 +13,8 @@ function Ring({ value, size=140, stroke=14, color='#2EB77E' }) {
           style={{ transition: 'stroke-dashoffset .6s cubic-bezier(.2,.9,.3,1)'}}/>
       </svg>
       <div className="ring-center">
-        <div className="v">{value}%</div>
-        <div className="l">Avance global</div>
+        <div className="v" style={{color}}>{value}%</div>
+        <div className="l">{label}</div>
       </div>
     </div>
   );
@@ -30,7 +30,7 @@ function PanelView({ store, onGoGantt }) {
     );
     const today = new Date(); today.setHours(0,0,0,0);
     return all
-      .filter(t => t.progress < 100)
+      .filter(t => getProg(t).avg < 100)
       .map(t => ({ ...t, startDate: parseISO(t.start) }))
       .sort((a,b) => a.startDate - b.startDate)
       .slice(0, 6);
@@ -39,7 +39,7 @@ function PanelView({ store, onGoGantt }) {
   // riesgo: atrasadas
   const atrasadas = useMemo(() => {
     const today = new Date(); today.setHours(0,0,0,0);
-    return state.phases.flatMap(p => p.tasks).filter(t => !t.milestone && parseISO(t.end) < today && t.progress < 100).length;
+    return state.phases.flatMap(p => p.tasks).filter(t => !t.milestone && parseISO(t.end) < today && getProg(t).avg < 100).length;
   }, [state.phases]);
 
   return (
@@ -47,33 +47,43 @@ function PanelView({ store, onGoGantt }) {
       {/* KPIs */}
       <div className="panel-grid">
         <Kpi label="Tareas totales" value={stats.total} foot={<>{stats.done} completadas · {stats.inProgress} en curso</>} ribbon="b2"/>
-        <Kpi label="Avance promedio" value={`${stats.avgProgress}%`} foot={<span className="kpi-accent">+{Math.max(2, Math.round(stats.avgProgress/8))}% esta semana</span>} ribbon="b3"/>
-        <Kpi label="Hitos del ciclo" value={`${stats.milestonesDone}/${stats.milestones}`} foot="Próximo: Cierre 1er ciclo · 05 jun" ribbon="b1"/>
+        <Kpi label="Avance Peñalolén" value={`${stats.avgPen}%`} foot={<span style={{color:'#2A6FB5', fontWeight:700}}>Sede Peñalolén</span>} ribbon="b2"/>
+        <Kpi label="Avance Tobalaba" value={`${stats.avgTob}%`} foot={<span style={{color:'#C77F1E', fontWeight:700}}>Sede Tobalaba</span>} ribbon="b1"/>
         <Kpi label="Riesgos" value={atrasadas} foot={atrasadas > 0 ? <span style={{color:'var(--red)', fontWeight:700}}>Tareas atrasadas</span> : 'Sin atrasos'} ribbon="b4"/>
       </div>
 
       <div className="ring-card" style={{marginBottom:16}}>
-        <Ring value={stats.avgProgress} color="#2EB77E" />
+        <div style={{display:'flex', gap:18}}>
+          <Ring value={stats.avgPen} color="#2A6FB5" label="Peñalolén" />
+          <Ring value={stats.avgTob} color="#E0992E" label="Tobalaba" />
+        </div>
         <div>
-          <div style={{fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:14}}>Avance por fase</div>
+          <div style={{fontSize:14, fontWeight:700, color:'var(--text)', marginBottom:14}}>Avance por fase y sede</div>
           <div className="phase-stats">
             {state.phases.map((p, pi) => {
               const palette = PHASE_PALETTE[pi % PHASE_PALETTE.length];
               const tasks = p.tasks.filter(t => !t.milestone);
-              const avg = tasks.length ? Math.round(tasks.reduce((a,t)=>a+t.progress,0)/tasks.length) : 0;
-              const doneN = tasks.filter(t => t.progress >= 100).length;
+              const progs = tasks.map(getProg);
+              const avgPen = tasks.length ? Math.round(progs.reduce((a,x)=>a+x.pen,0)/tasks.length) : 0;
+              const avgTob = tasks.length ? Math.round(progs.reduce((a,x)=>a+x.tob,0)/tasks.length) : 0;
+              const doneN = progs.filter(x => x.avg >= 100).length;
               return (
                 <div key={p.id}>
                   <div className="phase-stat-row">
                     <span className="phase-dot" style={{background: palette.bar, width:12, height:12}}/>
                     <div>
                       <div className="name">{p.title}</div>
-                      <div className="meta">{doneN} de {tasks.length} tareas listas · {fmtFull(tasks[0]?.start || p.tasks[0]?.start || state.startDate)}</div>
+                      <div className="meta">{doneN} de {tasks.length} tareas listas</div>
                     </div>
-                    <div style={{fontFamily:'JetBrains Mono', fontWeight:700, color:'var(--navy)', fontSize:14}}>{avg}%</div>
+                    <div style={{fontFamily:'JetBrains Mono', fontWeight:700, fontSize:12, display:'flex', gap:6}}>
+                      <span style={{color:'#2A6FB5'}}>{avgPen}%</span>
+                      <span style={{color:'var(--text-3)'}}>/</span>
+                      <span style={{color:'#C77F1E'}}>{avgTob}%</span>
+                    </div>
                   </div>
-                  <div className="phase-stat-bar">
-                    <div style={{width: `${avg}%`, background: palette.bar}} />
+                  <div style={{display:'flex', flexDirection:'column', gap:3, marginTop:4}}>
+                    <div className="dual-bar"><div style={{width:`${avgPen}%`, background:'#2A6FB5'}}/></div>
+                    <div className="dual-bar"><div style={{width:`${avgTob}%`, background:'#E0992E'}}/></div>
                   </div>
                 </div>
               );
@@ -100,7 +110,7 @@ function PanelView({ store, onGoGantt }) {
                   <span className="dot" style={{background: palette.bar}}/>
                   <div>
                     <div className="tname">{t.title}</div>
-                    <div className="tmeta">{t.phase.title.split('·')[0].trim()} · {respLabel} · {t.progress}%</div>
+                    <div className="tmeta">{t.phase.title.split('·')[0].trim()} · {respLabel} · <span style={{color:'#2A6FB5', fontWeight:700}}>{getProg(t).pen}%</span> / <span style={{color:'#C77F1E', fontWeight:700}}>{getProg(t).tob}%</span></div>
                   </div>
                   <div className="twhen">
                     <strong>{fmtDM(t.start)}</strong>
@@ -169,8 +179,9 @@ function TeamView({ store }) {
       getResp(t).forEach(rid => {
         if (!map[rid]) map[rid] = { total: 0, done: 0, prog: 0 };
         map[rid].total++;
-        if (t.progress >= 100) map[rid].done++;
-        map[rid].prog += t.progress;
+        const pr = getProg(t).avg;
+        if (pr >= 100) map[rid].done++;
+        map[rid].prog += pr;
       });
     });
     return map;

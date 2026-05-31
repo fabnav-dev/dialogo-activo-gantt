@@ -884,6 +884,78 @@ input, select, textarea { font-family: inherit; color: inherit; }
   background: rgba(0,0,0,.18);
   pointer-events: none;
 }
+/* franjas de avance por sede: mitad superior Peñalolén, inferior Tobalaba */
+.tl-bar .fill-pen {
+  top: 0; bottom: 50%;
+  background: rgba(255,255,255,.34);
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.12);
+}
+.tl-bar .fill-tob {
+  top: 50%; bottom: 0;
+  background: rgba(0,0,0,.26);
+}
+.tl-bar.phase .fill-pen { background: rgba(255,255,255,.28); }
+.tl-bar.phase .fill-tob { background: rgba(0,0,0,.3); }
+
+/* barras partidas por sede (fechas distintas) */
+.tl-bar.half {
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+}
+.tl-bar.half .label { font-size: 10px; }
+.tl-bar.half .pct { font-size: 9px; }
+.tl-bar .fill-solid {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: rgba(255,255,255,.32);
+  pointer-events: none;
+}
+
+/* chips duales en la tabla */
+.dual-prog {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.dual-prog .dp-row { display: inline-flex; align-items: center; gap: 5px; color: var(--text); }
+.dp-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; display: inline-block; }
+
+/* sliders por sede en el editor */
+.sede-sliders { display: flex; flex-direction: column; gap: 14px; }
+.sede-slider-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12.5px; font-weight: 600; color: var(--text); margin-bottom: 4px;
+}
+.sede-slider-head span { display: inline-flex; align-items: center; gap: 7px; }
+.sede-slider-head strong { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.sede-slider input[type="range"] { width: 100%; }
+
+/* interruptor fechas por sede */
+.sede-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer;
+  text-transform: none; letter-spacing: 0;
+}
+.sede-toggle input { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; }
+.sede-dates {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.sede-dates .field { margin-bottom: 0; }
+.sede-dates-tag {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 700; color: var(--text);
+}
+.gantt-date-split { cursor: pointer; display: flex; flex-direction: column; gap: 1px; }
+.gantt-date-split:hover { background: var(--yellow-soft); border-radius: 5px; }
+.split-tag { font-size: 9px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .03em; }
+.split-range { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); }
 .tl-bar .label {
   position: relative;
   z-index: 1;
@@ -1092,6 +1164,13 @@ input, select, textarea { font-family: inherit; color: inherit; }
   height: 100%;
   border-radius: 3px;
 }
+.dual-bar {
+  height: 5px;
+  background: var(--bg-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dual-bar > div { height: 100%; border-radius: 3px; transition: width .5s cubic-bezier(.2,.9,.3,1); }
 
 /* split panel */
 .panel-split {
@@ -1422,6 +1501,8 @@ input, select, textarea { font-family: inherit; color: inherit; }
     display: flex; align-items: center; overflow: hidden;
   }
   .pr-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(0,0,0,.18); }
+  .pr-bar-fill.pen { top: 0; bottom: 50%; background: rgba(255,255,255,.4); }
+  .pr-bar-fill.tob { top: 50%; bottom: 0; background: rgba(0,0,0,.28); }
   .pr-bar-pct { position: relative; font-size: 6.5px; font-weight: 700; color: white; padding-left: 3px; }
   .pr-ms {
     position: absolute; top: 50%; width: 9px; height: 9px;

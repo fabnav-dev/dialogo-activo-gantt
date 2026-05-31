@@ -171,6 +171,19 @@ function saveToStorage(state) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
 }
 
+// Reasigna los códigos EDT (1, 1.1, 1.2…) según la posición actual,
+// para que no queden huecos al agregar o eliminar tareas/fases.
+function renumberPhases(phases) {
+  return phases.map((p, pi) => {
+    const wbs = String(pi + 1);
+    return {
+      ...p,
+      wbs,
+      tasks: p.tasks.map((t, ti) => ({ ...t, wbs: `${wbs}.${ti + 1}` })),
+    };
+  });
+}
+
 function useStore() {
   const initial = loadFromStorage();
   const [state, setState] = useState(initial || {
@@ -261,13 +274,16 @@ function useStore() {
   const stats = useMemo(() => {
     const allTasks = state.phases.flatMap(p => p.tasks.filter(t => !t.milestone));
     const total = allTasks.length;
-    const done = allTasks.filter(t => t.progress >= 100).length;
-    const inProgress = allTasks.filter(t => t.progress > 0 && t.progress < 100).length;
-    const pending = allTasks.filter(t => t.progress === 0).length;
-    const avgProgress = total ? Math.round(allTasks.reduce((a,t) => a + (t.progress||0), 0) / total) : 0;
+    const progs = allTasks.map(getProg);
+    const done = progs.filter(p => p.avg >= 100).length;
+    const inProgress = progs.filter(p => p.avg > 0 && p.avg < 100).length;
+    const pending = progs.filter(p => p.avg === 0).length;
+    const avgPen = total ? Math.round(progs.reduce((a,p) => a + p.pen, 0) / total) : 0;
+    const avgTob = total ? Math.round(progs.reduce((a,p) => a + p.tob, 0) / total) : 0;
+    const avgProgress = Math.round((avgPen + avgTob) / 2);
     const milestones = state.phases.flatMap(p => p.tasks.filter(t => t.milestone));
-    const milestonesDone = milestones.filter(m => m.progress >= 100).length;
-    return { total, done, inProgress, pending, avgProgress, milestones: milestones.length, milestonesDone };
+    const milestonesDone = milestones.filter(m => getProg(m).avg >= 100).length;
+    return { total, done, inProgress, pending, avgProgress, avgPen, avgTob, milestones: milestones.length, milestonesDone };
   }, [state.phases]);
 
   // === acciones ===
@@ -304,7 +320,7 @@ function useStore() {
       };
       return {
         ...s,
-        phases: s.phases.map(p => p.id === phaseId ? { ...p, tasks: [...p.tasks, newTask] } : p),
+        phases: renumberPhases(s.phases.map(p => p.id === phaseId ? { ...p, tasks: [...p.tasks, newTask] } : p)),
         log: [{id:'l'+Math.random().toString(36).slice(2,7), when:Date.now(), user:userIdRef.current, action:'added_task', target:newTask.wbs, detail:`agregó "${newTask.title}"`}, ...s.log].slice(0,80),
       };
     });
@@ -316,7 +332,7 @@ function useStore() {
       const task = phase.tasks.find(t => t.id === taskId);
       return {
         ...s,
-        phases: s.phases.map(p => p.id === phaseId ? { ...p, tasks: p.tasks.filter(t => t.id !== taskId) } : p),
+        phases: renumberPhases(s.phases.map(p => p.id === phaseId ? { ...p, tasks: p.tasks.filter(t => t.id !== taskId) } : p)),
         log: [{id:'l'+Math.random().toString(36).slice(2,7), when:Date.now(), user:userIdRef.current, action:'removed_task', target:task?.wbs, detail:`eliminó "${task?.title}"`}, ...s.log].slice(0,80),
       };
     });
@@ -334,7 +350,7 @@ function useStore() {
       };
       return {
         ...s,
-        phases: [...s.phases, newPhase],
+        phases: renumberPhases([...s.phases, newPhase]),
         log: [{id:'l'+Math.random().toString(36).slice(2,7), when:Date.now(), user:userIdRef.current, action:'created_phase', target:newPhase.wbs, detail:`creó "${newPhase.title}"`}, ...s.log].slice(0,80),
       };
     });
@@ -353,7 +369,7 @@ function useStore() {
       const phase = s.phases.find(p => p.id === phaseId);
       return {
         ...s,
-        phases: s.phases.filter(p => p.id !== phaseId),
+        phases: renumberPhases(s.phases.filter(p => p.id !== phaseId)),
         log: [{id:'l'+Math.random().toString(36).slice(2,7), when:Date.now(), user:userIdRef.current, action:'removed_task', target:phase?.wbs, detail:`eliminó la fase "${phase?.title}"`}, ...s.log].slice(0,80),
       };
     });
@@ -379,6 +395,39 @@ function getResp(task) {
   if (Array.isArray(task.responsibles) && task.responsibles.length) return task.responsibles;
   if (task.responsible) return [task.responsible];
   return [];
+}
+
+// === sedes (colegios) ===
+const SEDES = [
+  { id: 'pen', nm: 'Peñalolén', short: 'PEÑ', color: '#2A6FB5' },
+  { id: 'tob', nm: 'Tobalaba',  short: 'TOB', color: '#E0992E' },
+];
+
+// avance diferenciado por sede (con compatibilidad: si solo existe
+// "progress", ambas sedes parten con ese valor)
+function getProg(task) {
+  const base = typeof task.progress === 'number' ? task.progress : 0;
+  const pen = typeof task.progPen === 'number' ? task.progPen : base;
+  const tob = typeof task.progTob === 'number' ? task.progTob : base;
+  return { pen, tob, avg: Math.round((pen + tob) / 2) };
+}
+
+// fechas por sede (con compatibilidad: si no hay fechas separadas usa las compartidas)
+function getDates(task, sede) {
+  if (task.splitDates) {
+    if (sede === 'pen') return { start: task.startPen || task.start, end: task.endPen || task.end };
+    if (sede === 'tob') return { start: task.startTob || task.start, end: task.endTob || task.end };
+  }
+  return { start: task.start, end: task.end };
+}
+
+// rango envolvente (la fecha más temprana y la más tardía entre ambas sedes)
+function getEnvelope(task) {
+  if (!task.splitDates) return { start: task.start, end: task.end };
+  const p = getDates(task, 'pen'), t = getDates(task, 'tob');
+  const start = (parseISO(p.start) <= parseISO(t.start)) ? p.start : t.start;
+  const end = (parseISO(p.end) >= parseISO(t.end)) ? p.end : t.end;
+  return { start, end };
 }
 
 // === relative time ===
@@ -430,3 +479,7 @@ window.buildCalendar = buildCalendar;
 window.useStore = useStore;
 window.relTime = relTime;
 window.getResp = getResp;
+window.SEDES = SEDES;
+window.getProg = getProg;
+window.getDates = getDates;
+window.getEnvelope = getEnvelope;

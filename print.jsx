@@ -12,7 +12,8 @@ function PrintReport({ store }) {
     if (!all.length) return { start: parseISO(state.startDate), end: addDays(parseISO(state.startDate), 7), days: 7 };
     let min = parseISO(all[0].start), max = parseISO(all[0].end || all[0].start);
     all.forEach(t => {
-      const s = parseISO(t.start), e = parseISO(t.end || t.start);
+      const env = getEnvelope(t);
+      const s = parseISO(env.start), e = parseISO(env.end || env.start);
       if (s < min) min = s;
       if (e > max) max = e;
     });
@@ -64,10 +65,10 @@ function PrintReport({ store }) {
 
       {/* RESUMEN */}
       <div className="pr-summary">
-        <div className="pr-kpi"><div className="v">{stats.avgProgress}%</div><div className="l">Avance global</div></div>
+        <div className="pr-kpi"><div className="v" style={{color:'#2A6FB5'}}>{stats.avgPen}%</div><div className="l">Avance Peñalolén</div></div>
+        <div className="pr-kpi"><div className="v" style={{color:'#C77F1E'}}>{stats.avgTob}%</div><div className="l">Avance Tobalaba</div></div>
         <div className="pr-kpi"><div className="v">{stats.total}</div><div className="l">Tareas</div></div>
         <div className="pr-kpi"><div className="v">{stats.done}</div><div className="l">Completadas</div></div>
-        <div className="pr-kpi"><div className="v">{stats.inProgress}</div><div className="l">En curso</div></div>
         <div className="pr-kpi"><div className="v">{stats.milestonesDone}/{stats.milestones}</div><div className="l">Hitos</div></div>
         <div className="pr-kpi"><div className="v">{state.phases.length}</div><div className="l">Fases</div></div>
       </div>
@@ -95,12 +96,13 @@ function PrintReport({ store }) {
                         <span className="pr-ms" style={{ left: pct(t.start) + '%' }} title={t.title} />
                       ) : (
                         <span className="pr-bar" style={{
-                          left: pct(t.start) + '%',
-                          width: widthPct(t.start, t.end) + '%',
-                          background: t.progress >= 100 ? '#2EB77E' : palette.bar,
+                          left: pct(getEnvelope(t).start) + '%',
+                          width: widthPct(getEnvelope(t).start, getEnvelope(t).end) + '%',
+                          background: getProg(t).avg >= 100 ? '#2EB77E' : palette.bar,
                         }}>
-                          <span className="pr-bar-fill" style={{ width: (t.progress||0) + '%' }} />
-                          <span className="pr-bar-pct">{t.progress}%</span>
+                          <span className="pr-bar-fill pen" style={{ width: getProg(t).pen + '%' }} />
+                          <span className="pr-bar-fill tob" style={{ width: getProg(t).tob + '%' }} />
+                          <span className="pr-bar-pct">{getProg(t).pen}·{getProg(t).tob}%</span>
                         </span>
                       )}
                     </div>
@@ -118,13 +120,15 @@ function PrintReport({ store }) {
         {state.phases.map((phase, pi) => {
           const palette = PHASE_PALETTE[pi % PHASE_PALETTE.length];
           const realTasks = phase.tasks.filter(t => !t.milestone);
-          const avg = realTasks.length ? Math.round(realTasks.reduce((a,t)=>a+t.progress,0)/realTasks.length) : 0;
+          const rprogs = realTasks.map(getProg);
+          const avgPen = realTasks.length ? Math.round(rprogs.reduce((a,x)=>a+x.pen,0)/realTasks.length) : 0;
+          const avgTob = realTasks.length ? Math.round(rprogs.reduce((a,x)=>a+x.tob,0)/realTasks.length) : 0;
           return (
             <div className="pr-phase-block" key={phase.id}>
               <div className="pr-phase-title">
                 <span className="pr-dot" style={{ background: palette.bar }} />
                 <strong>{phase.title}</strong>
-                <span className="pr-phase-avg">{avg}% · {phase.tasks.length} tareas</span>
+                <span className="pr-phase-avg">Peñalolén {avgPen}% · Tobalaba {avgTob}% · {phase.tasks.length} tareas</span>
               </div>
               <table className="pr-table">
                 <thead>
@@ -135,7 +139,8 @@ function PrintReport({ store }) {
                     <th className="c-date">Inicio</th>
                     <th className="c-date">Término</th>
                     <th className="c-dur">Días</th>
-                    <th className="c-prog">% Avance</th>
+                    <th className="c-prog">% Peñalolén</th>
+                    <th className="c-prog">% Tobalaba</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -144,12 +149,16 @@ function PrintReport({ store }) {
                       <td className="c-wbs">{t.wbs}</td>
                       <td className="c-task">{t.milestone ? '◆ ' : ''}{t.title}</td>
                       <td className="c-resp">{respNames(t).join(', ') || '—'}</td>
-                      <td className="c-date">{fmtFull(t.start)}</td>
-                      <td className="c-date">{t.milestone ? '—' : fmtFull(t.end)}</td>
-                      <td className="c-dur">{t.milestone ? '—' : workdays(t.start, t.end) + 'd'}</td>
+                      <td className="c-date">{fmtFull(getEnvelope(t).start)}{t.splitDates ? ' ✦' : ''}</td>
+                      <td className="c-date">{t.milestone ? '—' : fmtFull(getEnvelope(t).end)}</td>
+                      <td className="c-dur">{t.milestone ? '—' : workdays(getEnvelope(t).start, getEnvelope(t).end) + 'd'}</td>
                       <td className="c-prog">
-                        <span className="pr-mini"><span style={{ width: (t.progress||0)+'%', background: t.progress>=100?'#2EB77E':palette.bar }} /></span>
-                        {t.progress}%
+                        <span className="pr-mini"><span style={{ width: getProg(t).pen+'%', background:'#2A6FB5' }} /></span>
+                        {getProg(t).pen}%
+                      </td>
+                      <td className="c-prog">
+                        <span className="pr-mini"><span style={{ width: getProg(t).tob+'%', background:'#E0992E' }} /></span>
+                        {getProg(t).tob}%
                       </td>
                     </tr>
                   ))}

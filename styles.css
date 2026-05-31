@@ -487,6 +487,57 @@ input, select, textarea { font-family: inherit; color: inherit; }
 .gantt-row-left:hover .row-del { opacity: 1; pointer-events: auto; }
 .row-del:hover { background: var(--red-soft); border-color: var(--red); }
 .gantt-row-left.is-phase .row-del { color: var(--red); background: white; }
+
+/* fila / barra atrasada */
+.gantt-row-left.is-overdue { background: rgba(218,92,92,.05); }
+.gantt-row-left.is-overdue:hover { background: rgba(218,92,92,.09); }
+.gantt-row-left.is-overdue .gantt-date input[type="date"]:last-of-type,
+.gantt-row-left.is-overdue .gantt-dur { color: var(--red); font-weight: 700; }
+.tl-bar.overdue { box-shadow: 0 0 0 2px var(--red), 0 1px 2px rgba(0,0,0,.08); }
+
+/* filtro en barra de herramientas */
+.gantt-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 10px;
+  color: var(--text-2);
+}
+.gantt-filter select {
+  border: none; background: transparent; padding: 8px 4px;
+  font-size: 13px; font-weight: 600; color: var(--navy); cursor: pointer;
+  appearance: none;
+}
+.gantt-filter select:focus { outline: none; }
+
+.gantt-filterbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--border);
+  background: #FBFCFE;
+}
+.gantt-filter-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--text-2);
+  background: var(--yellow-soft); border: 1px solid #F0D77A;
+  padding: 4px 6px 4px 11px; border-radius: 999px;
+}
+.gantt-filter-chip strong { color: var(--navy); }
+.gantt-filter-chip button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  color: var(--text-2); background: rgba(0,0,0,.06);
+}
+.gantt-filter-chip button:hover { background: rgba(0,0,0,.12); color: var(--navy); }
+.gantt-overdue-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600; color: var(--red);
+  background: var(--red-soft); padding: 4px 11px; border-radius: 999px;
+}
+.gantt-overdue-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
 .gantt-row-left:hover { background: #FAFBFD; }
 .gantt-row-left > div { padding: 0 8px; overflow: hidden; }
 .gantt-wbs {

@@ -13,24 +13,6 @@ function App() {
     setTimeout(() => setToast(null), 2400);
   };
 
-  // simulación de actividad SOLO en modo local (sin nube). En la nube, la
-  // actividad es real y proviene de los demás editores.
-  useEffect(() => {
-    if (store.cloud) return;
-    const sims = [
-      { user: 'cl', action: 'updated_progress', target: '2.1', detail: 'subió de 55% a 60%' },
-      { user: 'mr', action: 'commented', target: '3.1', detail: '"Necesito acceso al panel de métricas RE 2026"' },
-      { user: 'ct', action: 'edited_task', target: '2.4', detail: 'ajustó fecha de término al 04/05' },
-      { user: 'nc', action: 'updated_progress', target: '1.5', detail: 'subió de 60% a 70%' },
-    ];
-    let i = 0;
-    const t = setInterval(() => {
-      store.addLog(sims[i % sims.length]);
-      i++;
-    }, 32000);
-    return () => clearInterval(t);
-  }, [store.cloud]);
-
   return (
     <>
       <Header

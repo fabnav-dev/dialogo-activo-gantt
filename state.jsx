@@ -146,14 +146,7 @@ const SEED_PHASES = [
   },
 ];
 
-const SEED_LOG = [
-  { id:'l1', user:'ep', when: Date.now()-1000*60*4,    action:'updated_progress', target:'1.1', detail:'subió de 25% a 35%' },
-  { id:'l2', user:'cl', when: Date.now()-1000*60*22,   action:'edited_task',      target:'1.3', detail:'fijó capacitación del 08 al 12 de junio' },
-  { id:'l3', user:'mr', when: Date.now()-1000*60*55,   action:'added_task',       target:'1.4', detail:'agregó "Configuración plataforma RE 2026"' },
-  { id:'l4', user:'ep', when: Date.now()-1000*60*60*2, action:'created_phase',    target:'4',   detail:'creó la fase "Cierre y Plan 2027"' },
-  { id:'l5', user:'nc', when: Date.now()-1000*60*60*5, action:'commented',        target:'1.5', detail:'"Coordinar circular con dirección de Tobalaba antes del 12/06"' },
-  { id:'l6', user:'ct', when: Date.now()-1000*60*60*22,action:'updated_progress', target:'1.2', detail:'subió de 10% a 20%' },
-];
+const SEED_LOG = [];
 
 const ACTION_LABELS = {
   updated_progress: 'actualizó el avance de',

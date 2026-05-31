@@ -119,6 +119,11 @@ function PanelView({ store, onGoGantt }) {
             <span style={{fontSize:11, color:'var(--text-2)'}}>EN VIVO</span>
           </header>
           <div className="card-block-body" style={{padding:'4px 18px 14px'}}>
+            {store.state.log.length === 0 && (
+              <div style={{padding:'24px 8px', textAlign:'center', color:'var(--text-3)', fontSize:13}}>
+                Aún no hay actividad. Los cambios del equipo aparecerán aquí.
+              </div>
+            )}
             {store.state.log.slice(0, 5).map(entry => {
               const user = TEAM.find(t => t.id === entry.user);
               return (

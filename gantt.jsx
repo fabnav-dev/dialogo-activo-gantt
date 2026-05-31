@@ -15,6 +15,14 @@ function dayIndexFrom(startISO, isoDate) {
   return diffDays(parseISO(startISO), parseISO(isoDate));
 }
 
+// una tarea está atrasada si su término ya pasó y no está completa
+function isOverdue(task) {
+  if (task.milestone) return false;
+  if ((task.progress || 0) >= 100) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return parseISO(task.end) < today;
+}
+
 function TaskBar({ task, phaseIdx, startISO, totalDays, onPatch, color, soft, onEdit, dayW }) {
   const dragState = useRef(null);
   const [drag, setDrag] = useState(null);
@@ -89,10 +97,11 @@ function TaskBar({ task, phaseIdx, startISO, totalDays, onPatch, color, soft, on
 
   const pct = task.progress || 0;
   const barColor = pct >= 100 ? '#2EB77E' : color;
+  const overdue = isOverdue(task);
 
   return (
     <div
-      className="tl-bar"
+      className={`tl-bar ${overdue ? 'overdue' : ''}`}
       style={{
         left,
         width,
@@ -255,6 +264,13 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
   }, [allDays]);
 
   const phasesRendered = state.phases;
+  const matchTask = (t) => filter === 'all' || getResp(t).includes(filter);
+
+  // conteo de atrasadas (para el aviso del filtro)
+  const overdueCount = useMemo(
+    () => state.phases.flatMap(p => p.tasks).filter(isOverdue).length,
+    [state.phases]
+  );
 
   // task editor modal
   const [editing, setEditing] = useState(null);
@@ -298,6 +314,16 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
             </div>
           </div>
           <div className="gantt-spacer" />
+          <div className="gantt-filter">
+            <Icon.Filter size={13} />
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} title="Filtrar por responsable">
+              <option value="all">Todas las tareas</option>
+              {store.currentUserId && <option value={store.currentUserId}>Solo mis tareas</option>}
+              <optgroup label="Por responsable">
+                {TEAM.map(t => <option key={t.id} value={t.id}>{t.nm}</option>)}
+              </optgroup>
+            </select>
+          </div>
           <div className="seg">
             <button className={view === 'day' ? 'active' : ''} onClick={() => setView('day')}>Días</button>
             <button className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}>Semanas</button>
@@ -308,6 +334,22 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
             Nueva fase
           </button>
         </div>
+
+        {(filter !== 'all' || overdueCount > 0) && (
+          <div className="gantt-filterbar">
+            {filter !== 'all' && (
+              <span className="gantt-filter-chip">
+                Mostrando solo: <strong>{TEAM.find(t => t.id === filter)?.nm || 'filtro'}</strong>
+                <button onClick={() => setFilter('all')} title="Quitar filtro"><Icon.X size={12}/></button>
+              </span>
+            )}
+            {overdueCount > 0 && (
+              <span className="gantt-overdue-chip">
+                <span className="dot"/> {overdueCount} {overdueCount === 1 ? 'tarea atrasada' : 'tareas atrasadas'}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* BODY */}
         <div className="gantt-body">
@@ -353,7 +395,7 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
                       <Icon.Trash size={14}/>
                     </button>
                   </div>
-                  {phase.expanded && phase.tasks.map(task => (
+                  {phase.expanded && phase.tasks.filter(matchTask).map(task => (
                     <TaskRowLeft
                       key={task.id}
                       task={task}
@@ -364,7 +406,7 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
                       onEdit={() => setEditing({ phaseId: phase.id, task })}
                     />
                   ))}
-                  {phase.expanded && (
+                  {phase.expanded && filter === 'all' && (
                     <div className="gantt-addrow" onClick={() => addTask(phase.id)}>
                       <div></div>
                       <div style={{display:'flex',alignItems:'center',gap:6, gridColumn:'2 / -1'}}>
@@ -416,7 +458,7 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
                         ))}
                         <PhaseBar phase={phase} startISO={state.startDate} color={palette.bar} dayW={dayW}/>
                       </div>
-                      {phase.expanded && phase.tasks.map(task => (
+                      {phase.expanded && phase.tasks.filter(matchTask).map(task => (
                         <div key={task.id} className="tl-row" style={{ gridTemplateColumns: colTemplate, position: 'relative' }}>
                           {allDays.map((d, i) => (
                             <div key={i} className={`cell ${d.weekend ? 'weekend':''} ${i===todayOffset?'today':''}`} />
@@ -434,7 +476,7 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
                           />
                         </div>
                       ))}
-                      {phase.expanded && (
+                      {phase.expanded && filter === 'all' && (
                         <div className="tl-row" style={{ height: 40, gridTemplateColumns: colTemplate }}>
                           {allDays.map((d, i) => (
                             <div key={i} className={`cell ${d.weekend ? 'weekend':''} ${i===todayOffset?'today':''}`} />
@@ -520,7 +562,7 @@ function TaskRowLeft({ task, phase, palette, onPatch, onRemove, onEdit }) {
     );
   }
   return (
-    <div className="gantt-row-left">
+    <div className={`gantt-row-left ${isOverdue(task) ? 'is-overdue' : ''}`}>
       <div style={{fontSize:11, color:'var(--text-3)', fontFamily:'JetBrains Mono'}}>{task.wbs}</div>
       <div className="gantt-task-title">
         <span className="phase-dot" style={{background: palette.bar, opacity: .8}}/>

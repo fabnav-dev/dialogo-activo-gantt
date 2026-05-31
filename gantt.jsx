@@ -749,16 +749,16 @@ function TaskEditor({ task, phaseId, onClose, onPatch, onRemove }) {
                   <div className="sede-dates">
                     <div className="sede-dates-tag"><i className="dp-dot" style={{background:'#2A6FB5'}}/> Peñalolén</div>
                     <div className="field"><label>Inicio</label>
-                      <input type="date" value={local.startPen || local.start} onChange={(e) => setLocal({...local, startPen: e.target.value})} /></div>
+                      <input type="date" value={local.startPen || ''} onChange={(e) => setLocal({...local, startPen: e.target.value})} /></div>
                     <div className="field"><label>Término</label>
-                      <input type="date" value={local.endPen || local.end} onChange={(e) => setLocal({...local, endPen: e.target.value})} /></div>
+                      <input type="date" value={local.endPen || ''} onChange={(e) => setLocal({...local, endPen: e.target.value})} /></div>
                   </div>
                   <div className="sede-dates">
                     <div className="sede-dates-tag"><i className="dp-dot" style={{background:'#E0992E'}}/> Tobalaba</div>
                     <div className="field"><label>Inicio</label>
-                      <input type="date" value={local.startTob || local.start} onChange={(e) => setLocal({...local, startTob: e.target.value})} /></div>
+                      <input type="date" value={local.startTob || ''} onChange={(e) => setLocal({...local, startTob: e.target.value})} /></div>
                     <div className="field"><label>Término</label>
-                      <input type="date" value={local.endTob || local.end} onChange={(e) => setLocal({...local, endTob: e.target.value})} /></div>
+                      <input type="date" value={local.endTob || ''} onChange={(e) => setLocal({...local, endTob: e.target.value})} /></div>
                   </div>
                 </>
               )}

@@ -221,7 +221,11 @@ function TeamView({ store }) {
                       </div>
                     </td>
                     <td style={{padding:'12px 8px', borderBottom:'1px dashed var(--border)'}}>
-                      <select style={{border:'1px solid var(--border)', borderRadius:8, padding:'6px 10px', fontSize:12.5, background:'white'}} defaultValue={t.id === 'ep' ? 'admin' : 'editor'}>
+                      <select
+                        style={{border:'1px solid var(--border)', borderRadius:8, padding:'6px 10px', fontSize:12.5, background:'white'}}
+                        value={(state.roles && state.roles[t.id]) || (t.id === 'ep' ? 'admin' : 'editor')}
+                        onChange={(e) => store.updateProject({ roles: { ...(state.roles||{}), [t.id]: e.target.value } })}
+                      >
                         <option value="admin">Administrador</option>
                         <option value="editor">Editor</option>
                         <option value="lector">Solo lectura</option>

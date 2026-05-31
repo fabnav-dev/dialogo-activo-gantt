@@ -42,7 +42,7 @@ function App() {
         onlineUsers={store.onlineUsers}
         currentUserId={store.currentUserId}
         onExport={() => setExportOpen(true)}
-        onPrint={() => window.print()}
+        onPrint={() => { setTimeout(() => window.print(), 100); }}
         onShare={() => setShareOpen(true)}
       />
       <SaveBar saveStatus={store.saveStatus} savedAt={store.state.savedAt} cloud={store.cloud} onlineUsers={store.onlineUsers} />
@@ -87,6 +87,9 @@ function App() {
       {exportOpen && <ExportModal onClose={() => setExportOpen(false)} store={store} showToast={showToast} />}
       {shareOpen && <ShareModal onClose={() => setShareOpen(false)} showToast={showToast} cloud={store.cloud} />}
       {store.needIdentity && <IdentityModal onPick={store.setIdentity} />}
+
+      {/* Informe imprimible — oculto en pantalla, visible solo al imprimir/PDF */}
+      <PrintReport store={store} />
 
       {toast && (
         <div className="toast">

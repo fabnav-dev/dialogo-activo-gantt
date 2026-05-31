@@ -202,8 +202,9 @@ function ExportModal({ onClose, store, showToast }) {
     onClose();
   };
   const print = () => {
-    window.print();
     onClose();
+    // espera a que el modal se desmonte antes de abrir el diálogo de impresión
+    setTimeout(() => window.print(), 250);
   };
   const fileRef = useRef(null);
   const importJson = (e) => {

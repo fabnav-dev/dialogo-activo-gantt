@@ -659,7 +659,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-pop);
-  z-index: 60;
+  z-index: 360;
   overflow: hidden;
   animation: pop .15s cubic-bezier(.2,.9,.3,1.3);
 }

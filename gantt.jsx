@@ -303,10 +303,6 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
             <button className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}>Semanas</button>
             <button className={view === 'month' ? 'active' : ''} onClick={() => setView('month')}>Meses</button>
           </div>
-          <button className="btn" onClick={onOpenAi}>
-            <Icon.Sparkles size={14} />
-            Sugerir con IA
-          </button>
           <button className="btn gold" onClick={() => addPhase()}>
             <Icon.Plus size={14} />
             Nueva fase

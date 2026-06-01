@@ -176,10 +176,14 @@ function saveToStorage(state) {
 function renumberPhases(phases) {
   return phases.map((p, pi) => {
     const wbs = String(pi + 1);
+    let taskN = 0, mileN = 0;
     return {
       ...p,
       wbs,
-      tasks: p.tasks.map((t, ti) => ({ ...t, wbs: `${wbs}.${ti + 1}` })),
+      tasks: p.tasks.map((t) => {
+        if (t.milestone) { mileN++; return { ...t, wbs: `${wbs}.H${mileN}` }; }
+        taskN++; return { ...t, wbs: `${wbs}.${taskN}` };
+      }),
     };
   });
 }
@@ -316,27 +320,31 @@ function useStore() {
     setState(s => ({ ...s, log: [{ id: 'l'+Math.random().toString(36).slice(2,7), when: Date.now(), ...entry }, ...s.log].slice(0,80) }));
   }, []);
 
-  const addTask = useCallback((phaseId) => {
+  const addTask = useCallback((phaseId, opts = {}) => {
     setState(s => {
       const phase = s.phases.find(p => p.id === phaseId);
       const nextN = phase.tasks.filter(t => !t.milestone).length + 1;
-      const lastTask = phase.tasks[phase.tasks.length-1];
-      const startISO = lastTask ? lastTask.end : s.startDate;
-      const start = addDays(parseISO(startISO), 1);
-      const end = addDays(start, 4);
+      const lastTask = [...phase.tasks].reverse().find(t => t.end && /^\d{4}-\d{2}-\d{2}$/.test(t.end));
+      const startISO = (lastTask && lastTask.end) || s.startDate;
+      const base = parseISO(startISO);
+      const safeBase = isNaN(base.getTime()) ? parseISO(s.startDate) : base;
+      const start = addDays(safeBase, 1);
+      const isMile = !!opts.milestone;
+      const end = isMile ? start : addDays(start, 4);
       const newTask = {
         id: 't' + Math.random().toString(36).slice(2,8),
-        wbs: `${phase.wbs}.${nextN}`,
-        title: 'Nueva tarea',
+        wbs: isMile ? `${phase.wbs}.H` : `${phase.wbs}.${nextN}`,
+        title: isMile ? 'Nuevo hito' : 'Nueva tarea',
         responsible: TEAM[0].id,
         start: fmtISO(start),
         end: fmtISO(end),
         progress: 0,
+        ...(isMile ? { milestone: true } : {}),
       };
       return {
         ...s,
         phases: renumberPhases(s.phases.map(p => p.id === phaseId ? { ...p, tasks: [...p.tasks, newTask] } : p)),
-        log: [{id:'l'+Math.random().toString(36).slice(2,7), when:Date.now(), user:userIdRef.current, action:'added_task', target:newTask.wbs, detail:`agregó "${newTask.title}"`}, ...s.log].slice(0,80),
+        log: [{id:'l'+Math.random().toString(36).slice(2,7), when:Date.now(), user:userIdRef.current, action:'added_task', target:newTask.wbs, detail:`agregó ${isMile ? 'el hito' : 'la tarea'} "${newTask.title}"`}, ...s.log].slice(0,80),
       };
     });
   }, []);

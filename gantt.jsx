@@ -438,10 +438,15 @@ function GanttView({ store, onOpenAi, onOpenExport }) {
                     />
                   ))}
                   {phase.expanded && filter === 'all' && (
-                    <div className="gantt-addrow" onClick={() => addTask(phase.id)}>
+                    <div className="gantt-addrow" style={{cursor:'default'}}>
                       <div></div>
-                      <div style={{display:'flex',alignItems:'center',gap:6, gridColumn:'2 / -1'}}>
-                        <Icon.Plus size={13}/> Agregar tarea
+                      <div style={{display:'flex',alignItems:'center',gap:16, gridColumn:'2 / -1'}}>
+                        <span style={{display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => addTask(phase.id)}>
+                          <Icon.Plus size={13}/> Agregar tarea
+                        </span>
+                        <span style={{display:'inline-flex',alignItems:'center',gap:6,cursor:'pointer'}} onClick={() => addTask(phase.id, { milestone: true })} title="Un hito marca una fecha clave (◆), sin duración ni avance">
+                          <span style={{fontSize:11, color:'var(--blue)'}}>◆</span> Agregar hito
+                        </span>
                       </div>
                     </div>
                   )}
@@ -662,8 +667,8 @@ function TaskEditor({ task, phaseId, onClose, onPatch, onRemove }) {
         <header>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
             <div>
-              <h3>{task.milestone ? 'Editar hito' : 'Editar tarea'}</h3>
-              <p>EDT {task.wbs} · {task.milestone ? 'Marcador de avance' : 'Tarea programada'}</p>
+              <h3>{local.milestone ? 'Editar hito' : 'Editar tarea'}</h3>
+              <p>EDT {task.wbs} · {local.milestone ? 'Marcador de avance' : 'Tarea programada'}</p>
             </div>
             <button className="btn-icon" onClick={onClose}><Icon.X /></button>
           </div>
@@ -674,12 +679,27 @@ function TaskEditor({ task, phaseId, onClose, onPatch, onRemove }) {
             <input value={local.title} onChange={(e) => setLocal({...local, title: e.target.value})} />
           </div>
           <div className="field">
+            <label>Tipo</label>
+            <label className="sede-toggle">
+              <input type="checkbox" checked={!!local.milestone}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  if (on) setLocal({...local, milestone: true, end: local.start, splitDates: false});
+                  else setLocal({...local, milestone: false, end: local.end && local.end !== local.start ? local.end : fmtISO(addDays(parseISO(local.start), 4))});
+                }}/>
+              <span>◆ Es un hito (marca una fecha clave, sin duración ni avance)</span>
+            </label>
+          </div>
+          {!local.milestone && (
+          <div className="field">
             <label>Responsables</label>
             <ResponsiblePicker
               value={getResp(local)}
               onChange={(arr) => setLocal({...local, responsibles: arr, responsible: arr[0]})}
             />
           </div>
+          )}
+          {!local.milestone && (
           <div className="field">
             <label>Avance por sede</label>
             <div className="sede-sliders">
@@ -714,7 +734,8 @@ function TaskEditor({ task, phaseId, onClose, onPatch, onRemove }) {
               })()}
             </div>
           </div>
-          {task.milestone ? (
+          )}
+          {local.milestone ? (
             <div className="field">
               <label>Fecha del hito</label>
               <input type="date" value={local.start} onChange={(e) => setLocal({...local, start: e.target.value, end: e.target.value})} />

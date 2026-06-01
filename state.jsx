@@ -203,6 +203,10 @@ function useStore() {
   const Sync = (typeof window !== 'undefined' && window.GanttSync) || { enabled: false };
   const cloud = !!Sync.enabled;
   const skipNextCloudSave = useRef(false);
+  // CLAVE: no escribir en la nube hasta haber recibido (o sembrado) el doc
+  // compartido por primera vez. Evita que un navegador recién abierto pise
+  // los datos del equipo con los valores por defecto.
+  const cloudReady = useRef(false);
 
   // identidad del editor (quién soy)
   const [currentUserId, setCurrentUserId] = useState(() => {
@@ -222,11 +226,16 @@ function useStore() {
   useEffect(() => {
     if (!cloud) return;
     if (!Sync.init()) return;
-    // siembra el doc compartido la primera vez
-    Sync.seedIfEmpty(state, () => {});
+    // siembra el doc compartido SOLO si está vacío.
+    // existed=true  -> ya hay datos del equipo; esperamos a onState (no empujar aún)
+    // existed=false -> documento vacío, lo acabamos de sembrar; ya es seguro escribir
+    Sync.seedIfEmpty(state, (existed) => {
+      if (!existed) cloudReady.current = true;
+    });
     // escucha cambios de otros editores
     const unsub = Sync.onState((remote) => {
       skipNextCloudSave.current = true;     // evita reenviar lo que acabamos de recibir
+      cloudReady.current = true;            // ya recibimos el doc compartido: seguro escribir
       setState(remote);
     });
     return () => { try { unsub && unsub(); } catch {} };
@@ -261,8 +270,14 @@ function useStore() {
     }, 600);
 
     if (cloud) {
-      if (skipNextCloudSave.current) {
+      // todavía no sincronizamos con la nube por primera vez:
+      // guardamos en localStorage (arriba) pero NO escribimos en Firebase,
+      // para no pisar los datos del equipo con el estado inicial.
+      if (!cloudReady.current) {
+        clearTimeout(cloudTimer.current);
+      } else if (skipNextCloudSave.current) {
         skipNextCloudSave.current = false; // este cambio vino de la nube; no reenviar
+        clearTimeout(cloudTimer.current);
       } else {
         clearTimeout(cloudTimer.current);
         cloudTimer.current = setTimeout(() => Sync.save(state), 700);
